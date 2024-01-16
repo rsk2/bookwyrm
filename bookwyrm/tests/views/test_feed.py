@@ -1,5 +1,6 @@
 """ test for app action functionality """
 from io import BytesIO
+from datetime import datetime
 from unittest.mock import patch
 import pathlib
 
@@ -104,6 +105,40 @@ class FeedViews(TestCase):
             result = view(request, "mouse", status.id)
         self.assertIsInstance(result, ActivitypubResponse)
         self.assertEqual(result.status_code, 200)
+
+    @patch('bookwyrm.views.feed.get_annual_summary_year')
+    def test_status_page_with_summary(self, get_year_mock, *_):
+        get_year_mock.return_value = 2002
+        # Create read through matching filter
+        models.ReadThrough.objects.create(
+            user=self.local_user,
+            finish_date = datetime(2001, 10, 10)
+        )
+        # get result
+        view = views.Status.as_view()
+        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
+            status = models.Status.objects.create(content="hi", user=self.local_user)
+        request = self.factory.get("")
+        request.user = self.local_user
+        with patch("bookwyrm.views.feed.is_api_request") as is_api:
+            is_api.return_value = False
+            result = view(request, "mouse", status.id)
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.context['has_summary_read_throughs'], True)
+
+    @patch('bookwyrm.views.feed.get_annual_summary_year')    
+    def test_status_page_without_summary(self, get_year_mock, *_):
+        get_year_mock.return_value = 2002
+        view = views.Status.as_view()
+        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
+            status = models.Status.objects.create(content="hi", user=self.local_user)
+        request = self.factory.get("")
+        request.user = self.local_user
+        with patch("bookwyrm.views.feed.is_api_request") as is_api:
+            is_api.return_value = False
+            result = view(request, "mouse", status.id)
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.context['has_summary_read_throughs'], False)
 
     def test_status_page_not_found(self, *_):
         """there are so many views, this just makes sure it LOADS"""

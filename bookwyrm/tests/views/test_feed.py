@@ -129,6 +129,7 @@ class FeedViews(TestCase):
     @patch('bookwyrm.views.feed.get_annual_summary_year')    
     def test_status_page_without_summary(self, get_year_mock, *_):
         get_year_mock.return_value = 2002
+        # Should be no matching read through so expect False below
         view = views.Status.as_view()
         with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
             status = models.Status.objects.create(content="hi", user=self.local_user)
